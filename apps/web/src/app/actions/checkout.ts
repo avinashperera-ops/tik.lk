@@ -25,7 +25,7 @@ export async function processTicketPurchase(input: PurchaseTicketInput) {
       return { success: false, error: 'Ticket tier not found.' };
     }
 
-    if (tier.quantityAvailable < quantity) {
+    if (tier.availableCount < quantity) {
       return { success: false, error: 'Not enough tickets available.' };
     }
 
@@ -38,8 +38,8 @@ export async function processTicketPurchase(input: PurchaseTicketInput) {
       user = await db.user.create({
         data: {
           email: buyerEmail,
-          name: buyerName,
-          role: 'BUYER',
+          fullName: buyerName,
+          globalRole: 'USER',
         },
       });
     }
@@ -50,7 +50,7 @@ export async function processTicketPurchase(input: PurchaseTicketInput) {
       await tx.ticketTier.update({
         where: { id: tierId },
         data: {
-          quantityAvailable: { decrement: quantity },
+          availableCount: { decrement: quantity },
         },
       });
 
@@ -72,8 +72,8 @@ export async function processTicketPurchase(input: PurchaseTicketInput) {
             eventId,
             tierId,
             ownerId: user.id,
-            signedHmacPayload: signedHmac,
-            status: 'ISSUED',
+            qrPayload: signedHmac,
+            status: 'RESERVED',
           },
         });
 
@@ -87,7 +87,7 @@ export async function processTicketPurchase(input: PurchaseTicketInput) {
 
         const updatedTicket = await tx.ticket.update({
           where: { id: newTicket.id },
-          data: { signedHmacPayload: finalSignedHmac },
+          data: { qrPayload: finalSignedHmac },
         });
 
         tickets.push(updatedTicket);

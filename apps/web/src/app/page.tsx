@@ -1,99 +1,79 @@
-'use client';
-
+import { db } from '@open-ticket/database';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { ArrowRight, Zap, Shield, Sparkles } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, ShieldCheck } from 'lucide-react';
 
-export default function HomePage() {
+export const dynamic = 'force-dynamic';
+
+export default async function EventsListPage() {
+  const events = await db.event.findMany({
+    include: { organization: true, ticketTiers: true },
+    orderBy: { startDate: 'asc' },
+  });
+
   return (
-    <div className="relative overflow-hidden pt-12 pb-24">
-      {/* Glow Backdrop */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/20 blur-[140px] rounded-full pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center max-w-3xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-6"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Next-Gen Open Source Ticketing
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-5xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.15]"
-          >
-            Butter-smooth ticketing for international shows.
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-6 text-lg text-slate-400 leading-relaxed"
-          >
-            Cryptographically signed HMAC passes, dynamic anti-screenshot QR codes, and hardware-ready gate scanners. Ready out of the box.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-10 flex items-center justify-center gap-4"
-          >
-            <Link
-              href="/events/cyber-pulse-2026"
-              className="px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all hover:scale-105"
-            >
-              View Featured Event
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/committee"
-              className="px-6 py-3.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-semibold transition-all hover:bg-slate-800/50"
-            >
-              Committee Portal
-            </Link>
-          </motion.div>
+    <div className="space-y-8 sm:space-y-12 pb-20 md:pb-0">
+      <div className="max-w-2xl space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold uppercase tracking-wider">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          Sri Lanka Dynamic Turnstile Passes
         </div>
-
-        {/* Feature Cards Grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6"
-        >
-          <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm">
-            <div className="p-3 w-fit rounded-xl bg-indigo-500/10 text-indigo-400 mb-4">
-              <Zap className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-white">Dynamic Refresh QR</h3>
-            <p className="mt-2 text-sm text-slate-400">TOTP-based rolling tokens refresh every 30s to defeat screenshot reselling.</p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm">
-            <div className="p-3 w-fit rounded-xl bg-indigo-500/10 text-indigo-400 mb-4">
-              <Shield className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-white">HMAC Signed Tokens</h3>
-            <p className="mt-2 text-sm text-slate-400">Every pass is cryptographically signed. Instant verification offline or online.</p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm">
-            <div className="p-3 w-fit rounded-xl bg-indigo-500/10 text-indigo-400 mb-4">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-white">Multi-Tenant Customizer</h3>
-            <p className="mt-2 text-sm text-slate-400">Event committees can fully customize colors, fonts, discounts, and ticket layouts.</p>
-          </div>
-        </motion.div>
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+          Explore Live Events
+        </h1>
+        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
+          Select an event to issue dynamic TOTP passes to your wallet.
+        </p>
       </div>
+
+      {events.length === 0 ? (
+        <div className="p-8 sm:p-12 text-center rounded-[32px] bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-slate-500">
+          No upcoming events found.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {events.map((event) => (
+            <Link
+              key={event.id}
+              href={`/events/${event.slug}`}
+              className="group rounded-[32px] bg-slate-100 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 p-6 flex flex-col justify-between space-y-6 shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1"
+            >
+              <div className="space-y-3">
+                <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                  {event.organization.name}
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors line-clamp-2">
+                  {event.title}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
+                  {event.description}
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span className="truncate">
+                      {new Date(event.startDate).toLocaleDateString('en-US', { dateStyle: 'medium' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span className="truncate">{event.venueName}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-xs text-slate-500 font-medium">Get Pass</span>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    View Tiers <ArrowRight className="w-3.5 h-3.5 text-blue-500" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
