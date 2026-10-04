@@ -15,7 +15,7 @@ The system mitigates ticket scalping, screenshot forgery, and illicit gate acces
 - **Neon Serverless PostgreSQL Integration:** Managed database layer using Prisma ORM to maintain throughput during high-concurrency ticketing operations.
 - **Bandwidth-Optimized Client Runtime:** Designed with minimal client-side asset overhead to maintain low latency across variable cellular network conditions.
 
----
+```
 
 ## System Architecture & Sequence Flow
 
@@ -32,7 +32,7 @@ The system mitigates ticket scalping, screenshot forgery, and illicit gate acces
              │                                   │                                    │
              │                                   └─ Response: ACCESS GRANTED          │
 
----
+```
 
 ## Tech Stack
 
@@ -57,39 +57,39 @@ The system mitigates ticket scalping, screenshot forgery, and illicit gate acces
 ### 1. Installation
 
 Clone the repository and install project dependencies:
-
+```
 git clone https://github.com/avinashperera-ops/tik-lk.git
 cd tik-lk
 pnpm install
-
+```
 ### 2. Environment Configuration
 
 Create a `.env` file in the project root directory:
-
+```
 DATABASE_URL="postgresql://neondb_owner:npg_YPhD0gs3RqNf@ep-quiet-brook-b5mugpj3-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 JWT_SECRET="openticket_super_secret_key_2026_production"
 TOTP_SECRET="openticket_super_secret_key_2026_production"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-
+```
 ### 3. Database Migration
 
 Synchronize the Prisma schema with your target database:
-
+```
 npx prisma db push
 npx prisma generate
-
+```
 ### 4. Application Execution
 
 Start the development server:
-
+```
 pnpm dev
-
+```
 Access the application interface at `http://localhost:3000`.
 
----
+
 
 ## Repository Structure
-
+```
 tik-lk/
 ├── apps/
 │   └── web/                   # Next.js 15 Web Application
@@ -106,7 +106,7 @@ tik-lk/
 ├── README.md
 └── package.json
 
----
+```
 
 ## Security Specifications
 
