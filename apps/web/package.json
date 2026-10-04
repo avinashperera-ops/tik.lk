@@ -1,0 +1,32 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@open-ticket/crypto": "workspace:*",
+    "@open-ticket/database": "workspace:*",
+    "@tailwindcss/postcss": "^4.0.0",
+    "framer-motion": "^11.11.0",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^0.454.0",
+    "next": "^15.0.0",
+    "postcss": "^8.4.47",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-qr-code": "^2.2.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@open-ticket/config": "workspace:*",
+    "@types/node": "^20.12.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.4.0"
+  }
+}

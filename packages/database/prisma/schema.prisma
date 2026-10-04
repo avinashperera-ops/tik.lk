@@ -1,0 +1,218 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum GlobalRole {
+  SUPER_ADMIN // God Mode - Full System Access
+  USER        // Regular User / Buyer / Committee Member
+}
+
+enum CommitteeRole {
+  OWNER
+  MANAGER
+  SCANNER_STAFF
+}
+
+enum TicketStatus {
+  AVAILABLE
+  RESERVED
+  PAID
+  CHECKED_IN
+  CANCELLED
+  REFUNDED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model User {
+  id               String               @id @default(uuid())
+  externalAuthId   String?              @unique // Clerk / Supabase Auth ID
+  email            String               @unique
+  fullName         String?
+  avatarUrl        String?
+  globalRole       GlobalRole           @default(USER)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  
+  // Relations
+  committeeMembers CommitteeMember[]
+  purchasedTickets Ticket[]             @relation("TicketOwner")
+  transactions     Transaction[]
+  gateLogs         GateLog[]            @relation("ScannerStaff")
+  auditLogs        AuditLog[]
+}
+
+model Organization {
+  id          String            @id @default(uuid())
+  name        String
+  slug        String            @unique
+  logoUrl     String?
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  members     CommitteeMember[]
+  events      Event[]
+}
+
+model CommitteeMember {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           CommitteeRole @default(MANAGER)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+model Event {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String           @unique
+  description    String
+  venueName      String
+  venueAddress   String
+  bannerImageUrl String?
+  startDate      DateTime
+  endDate        DateTime
+  isPublished    Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Dynamic Customizations per Event
+  customization  EventCustomization?
+  ticketTiers    TicketTier[]
+  discounts      DiscountRule[]
+  tickets        Ticket[]
+  gateLogs       GateLog[]
+}
+
+model EventCustomization {
+  id               String   @id @default(uuid())
+  eventId          String   @unique
+  event            Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  primaryColor     String   @default("#000000")
+  secondaryColor   String   @default("#ffffff")
+  accentColor      String   @default("#6366f1")
+  fontFamily       String   @default("Inter")
+  customCss        String?
+  heroLayout       String   @default("MODERN_FULL") // e.g., MODERN_FULL, MINIMAL, SPLIT
+  enableWaitlist   Boolean  @default(false)
+  passDesignConfig Json?    // Visual layout parameters for the physical/digital pass
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model TicketTier {
+  id             String       @id @default(uuid())
+  eventId        String
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name           String       // e.g. VIP, General Admission, Early Bird
+  description    String?
+  priceInCents   Int          // Amount in smallest currency unit (cents)
+  totalCapacity  Int
+  availableCount Int
+  maxPerUser     Int          @default(5)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  tickets        Ticket[]
+  discounts      DiscountRule[]
+
+  @@index([eventId])
+}
+
+model DiscountRule {
+  id             String       @id @default(uuid())
+  eventId        String
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  code           String       // e.g. "EARLYBIRD20"
+  discountType   DiscountType
+  value          Int          // Percentage (e.g. 20) or Cents (e.g. 1500)
+  maxUses        Int?
+  currentUses    Int          @default(0)
+  validFrom      DateTime?
+  validUntil     DateTime?
+  createdAt      DateTime     @default(now())
+
+  ticketTiers    TicketTier[]
+
+  @@unique([eventId, code])
+}
+
+model Ticket {
+  id             String       @id @default(uuid())
+  eventId        String
+  event          Event        @relation(fields: [eventId], references: [id])
+  tierId         String
+  tier           TicketTier   @relation(fields: [tierId], references: [id])
+  ownerId        String?
+  owner          User?        @relation("TicketOwner", fields: [ownerId], references: [id])
+  status         TicketStatus @default(AVAILABLE)
+  qrPayload      String?      @unique // HMAC-SHA256 Signed Payload
+  reservedUntil  DateTime?    // Lock timestamp for payment hold
+  version        Int          @default(0) // Optimistic concurrency lock
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  transactionId  String?
+  transaction    Transaction? @relation(fields: [transactionId], references: [id])
+  gateLogs       GateLog[]
+
+  @@index([eventId, status])
+  @@index([tierId, status])
+  @@index([ownerId])
+}
+
+model Transaction {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  amountInCents  Int
+  currency       String       @default("USD")
+  gateway        String       // e.g. "STRIPE"
+  gatewayTxId    String       @unique
+  status         String       // e.g. "COMPLETED", "FAILED"
+  createdAt      DateTime     @default(now())
+
+  tickets        Ticket[]
+}
+
+model GateLog {
+  id             String       @id @default(uuid())
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id])
+  eventId        String
+  event          Event        @relation(fields: [eventId], references: [id])
+  scannedById    String
+  scannedBy      User         @relation("ScannerStaff", fields: [scannedById], references: [id])
+  scanResult     String       // "SUCCESS", "DUPLICATE", "INVALID_HMAC", "WRONG_EVENT"
+  failureReason  String?
+  scannedAt      DateTime     @default(now())
+
+  @@index([ticketId])
+  @@index([eventId])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid())
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  action         String       // e.g., "PRICE_UPDATE", "SUPERADMIN_OVERRIDE"
+  targetEntity   String       // e.g., "Event", "TicketTier"
+  targetEntityId String
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+}
