@@ -54,22 +54,34 @@ enum PaymentMethod {
 }
 
 model User {
-  id               String            @id @default(uuid())
-  externalAuthId   String?           @unique
-  email            String            @unique
-  fullName         String?
-  phoneNumber      String?
-  avatarUrl        String?
-  globalRole       GlobalRole        @default(USER)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String?   // Nullable for OAuth/Google users
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime?
+  nic           String?   @unique
+  phoneNumber   String?
+  role          UserRole  @default(BUYER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  committeeMembers CommitteeMember[]
-  purchasedTickets Ticket[]          @relation("TicketOwner")
-  transactions     Transaction[]
-  gateLogs         GateLog[]         @relation("ScannerStaff")
-  auditLogs        AuditLog[]
-  affiliateLinks   AffiliateLink[]
+  // Named relation to match Ticket.owner
+  tickets       Ticket[]            @relation("TicketOwner")
+  orders        Order[]
+  transactions  Transaction[]
+  scannedLogs   GateLog[]           @relation("ScannerStaff")
+  affiliates    AffiliateLink[]
+  auditLogs     AuditLog[]
+  committees    CommitteeMember[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  BUYER
+  ORGANIZER
+  GATE_STAFF
 }
 
 model Organization {
@@ -206,6 +218,18 @@ model DiscountRule {
   ticketTiers  TicketTier[]
 
   @@unique([eventId, code])
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  totalInCents  Int
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("orders")
 }
 
 model Ticket {
