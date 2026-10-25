@@ -14,6 +14,7 @@
     "build": "tsc",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "postinstall": "prisma generate",
     "db:seed": "tsx prisma/seed.ts"
   },
   "prisma": {

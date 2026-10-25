@@ -8,9 +8,9 @@ import { redirect } from 'next/navigation';
 
 export async function issueDemoTicket(formData: FormData) {
   // Demo helper: it hands out free PAID tickets, so it must never run in production.
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Demo ticket issuing is disabled in production.');
-  }
+  if (process.env.ALLOW_DEMO_TICKETS !== 'true') {
+  throw new Error('Demo ticket issuing is disabled.');
+}
 
   // The ticket belongs to whoever is signed in
   const session = await auth();
