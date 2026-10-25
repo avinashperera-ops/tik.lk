@@ -1,21 +1,37 @@
-import { db } from '@open-ticket/database';
+import { db, TicketStatus } from '@open-ticket/database';
 import { generateDynamicQRToken } from '@open-ticket/crypto';
 import { GlassTicket } from '@/components/GlassTicket';
 import { Ticket } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function DashboardPage() {
-  const user = await db.user.findFirst();
+  // Only the signed-in user's tickets are ever loaded
+  const session = await auth();
+  const email = session?.user?.email?.toLowerCase();
 
-  const tickets = user
-    ? await db.ticket.findMany({
-        where: { ownerId: user.id },
-        include: { event: true, tier: true },
-        orderBy: { createdAt: 'desc' },
-      })
-    : [];
+  if (!email) {
+    redirect('/login');
+  }
+
+  const user = await db.user.findUnique({ where: { email } });
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  const tickets = await db.ticket.findMany({
+    where: {
+      ownerId: user.id,
+      // Hide unpaid/reserved tickets: the gate scanner rejects them anyway
+      status: { in: [TicketStatus.PAID, TicketStatus.CHECKED_IN] },
+    },
+    include: { event: true, tier: true },
+    orderBy: { createdAt: 'desc' },
+  });
 
   const activePass = tickets[0];
   const upcomingPasses = tickets.slice(1);

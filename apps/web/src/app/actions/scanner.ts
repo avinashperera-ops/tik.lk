@@ -1,5 +1,6 @@
 'use server';
 
+import { auth } from '@/auth';
 import { db, TicketStatus } from '@open-ticket/database';
 import { verifyDynamicQRToken } from '@open-ticket/crypto';
 import { revalidatePath } from 'next/cache';
@@ -16,6 +17,9 @@ export interface ScanResult {
   };
 }
 
+// Roles allowed to scan tickets. Keep in sync with ALLOWED_ROLES in committee/page.tsx
+const SCANNER_ROLES = ['ORGANIZER'];
+
 function displayName(owner: { firstName: string; lastName: string } | null | undefined) {
   if (!owner) return 'Attendee';
   const name = `${owner.firstName} ${owner.lastName}`.trim();
@@ -24,6 +28,12 @@ function displayName(owner: { firstName: string; lastName: string } | null | und
 
 export async function validateGateScan(scannedPayload: string): Promise<ScanResult> {
   try {
+    // 0. Only authorized staff may scan or check tickets in
+    const session = await auth();
+    if (!session?.user?.role || !SCANNER_ROLES.includes(session.user.role)) {
+      return { status: 'INVALID_SIGNATURE', message: 'Not authorized to scan tickets.' };
+    }
+
     const payload = typeof scannedPayload === 'string' ? scannedPayload.trim() : '';
     if (!payload) {
       return { status: 'INVALID_SIGNATURE', message: 'Empty scan.' };
