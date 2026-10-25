@@ -1,8 +1,9 @@
-node_modules/ 
-.next/ 
-.env 
-.env.local 
-.env.production 
-dist/ 
-.turbo/ 
-coverage/ 
+node_modules
+.next
+.turbo
+.turbo.zip
+*.tsbuildinfo
+package-lock.json
+.env
+.env.*
+!.env.example

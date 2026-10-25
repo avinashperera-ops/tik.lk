@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Providers } from '@/components/Providers';
+import { Providers } from '@/components/providers';
 import { Header } from '@/components/Header';
 import { getRoleSession } from '@/app/actions/auth';
 import './globals.css';

@@ -14,93 +14,115 @@ export interface PurchaseTicketInput {
 
 export async function processTicketPurchase(input: PurchaseTicketInput) {
   try {
-    const { eventId, tierId, buyerName, buyerEmail, quantity } = input;
+    const { tierId, buyerName, quantity } = input;
+    const buyerEmail = input.buyerEmail.trim().toLowerCase();
 
-    // 1. Fetch Tier & Validate Capacity
+    // 0. Validate input
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return { success: false, error: 'Invalid quantity.' };
+    }
+    if (!buyerEmail || !buyerName?.trim()) {
+      return { success: false, error: 'Name and email are required.' };
+    }
+
+    // 1. Fetch tier + event (trust the tier's event, not the client's eventId)
     const tier = await db.ticketTier.findUnique({
       where: { id: tierId },
+      include: { event: { select: { id: true, slug: true } } },
     });
 
     if (!tier) {
       return { success: false, error: 'Ticket tier not found.' };
     }
-
-    if (tier.availableCount < quantity) {
-      return { success: false, error: 'Not enough tickets available.' };
+    if (tier.eventId !== input.eventId) {
+      return { success: false, error: 'Tier does not belong to this event.' };
+    }
+    if (quantity > tier.maxPerUser) {
+      return { success: false, error: `Maximum ${tier.maxPerUser} tickets per order.` };
     }
 
-    // 2. Find or Create Buyer User
-    let user = await db.user.findUnique({
-      where: { email: buyerEmail },
-    });
+    const eventId = tier.eventId;
+
+    // 2. Find or create buyer
+    let user = await db.user.findUnique({ where: { email: buyerEmail } });
 
     if (!user) {
+      const [firstName, ...rest] = buyerName.trim().split(/\s+/);
       user = await db.user.create({
         data: {
           email: buyerEmail,
-          fullName: buyerName,
-          globalRole: 'USER',
+          firstName,
+          lastName: rest.join(' ') || '-',
+          role: 'BUYER',
         },
       });
     }
 
-    // 3. Create Ticket Records & Update Inventory inside transaction
-    const createdTickets = await db.$transaction(async (tx) => {
-      // Decrement available capacity
-      await tx.ticketTier.update({
-        where: { id: tierId },
-        data: {
-          availableCount: { decrement: quantity },
-        },
-      });
+    const buyer = user;
 
-      const tickets = [];
-
-      for (let i = 0; i < quantity; i++) {
-        // Dummy ticket ID created for initial payload signature
-        const ticketIdTemp = `tkt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        
-        const signedHmac = generateSignedTicketPayload({
-          ticketId: ticketIdTemp,
-          eventId,
-          tierId,
-          ownerId: user.id,
+    // 3. Reserve inventory and create tickets atomically
+    const createdTickets = await db.$transaction(
+      async (tx) => {
+        // Conditional decrement: only succeeds if enough stock remains.
+        // This closes the race where two buyers pass the check at once.
+        const reserved = await tx.ticketTier.updateMany({
+          where: { id: tierId, availableCount: { gte: quantity } },
+          data: { availableCount: { decrement: quantity } },
         });
 
-        const newTicket = await tx.ticket.create({
-          data: {
-            eventId,
-            tierId,
-            ownerId: user.id,
-            qrPayload: signedHmac,
-            status: 'RESERVED',
-          },
-        });
+        if (reserved.count === 0) {
+          throw new Error('SOLD_OUT');
+        }
 
-        // Re-sign with actual database primary key ID
-        const finalSignedHmac = generateSignedTicketPayload({
-          ticketId: newTicket.id,
-          eventId,
-          tierId,
-          ownerId: user.id,
-        });
+        const tickets = [];
 
-        const updatedTicket = await tx.ticket.update({
-          where: { id: newTicket.id },
-          data: { qrPayload: finalSignedHmac },
-        });
+        for (let i = 0; i < quantity; i++) {
+          const tempId = `tkt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-        tickets.push(updatedTicket);
-      }
+          const newTicket = await tx.ticket.create({
+            data: {
+              eventId,
+              tierId,
+              ownerId: buyer.id,
+              qrPayload: generateSignedTicketPayload({
+                ticketId: tempId,
+                eventId,
+                tierId,
+                ownerId: buyer.id,
+              }),
+              status: 'RESERVED',
+            },
+          });
 
-      return tickets;
-    });
+          // Re-sign with the real database ID
+          const updatedTicket = await tx.ticket.update({
+            where: { id: newTicket.id },
+            data: {
+              qrPayload: generateSignedTicketPayload({
+                ticketId: newTicket.id,
+                eventId,
+                tierId,
+                ownerId: buyer.id,
+              }),
+            },
+          });
+
+          tickets.push(updatedTicket);
+        }
+
+        return tickets;
+      },
+      { timeout: 15000 }
+    );
 
     revalidatePath('/dashboard');
-    revalidatePath(`/events/${eventId}`);
+    revalidatePath(`/events/${tier.event.slug}`);
 
     return { success: true, count: createdTickets.length };
   } catch (error) {
+    if (error instanceof Error && error.message === 'SOLD_OUT') {
+      return { success: false, error: 'Not enough tickets available.' };
+    }
     console.error('Purchase Error:', error);
     return { success: false, error: 'Transaction failed. Please try again.' };
   }

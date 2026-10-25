@@ -1,4 +1,4 @@
-import { PrismaClient, GlobalRole, CommitteeRole, DiscountType } from '@prisma/client';
+import { PrismaClient, CommitteeRole, DiscountType, UserRole } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -23,8 +23,9 @@ async function main() {
   const superAdmin = await prisma.user.create({
     data: {
       email: 'admin@openticket.io',
-      fullName: 'System Super Admin',
-      globalRole: GlobalRole.SUPER_ADMIN,
+      firstName: 'System',
+      lastName: 'Super Admin',
+      role: UserRole.ORGANIZER,
     },
   });
 
@@ -32,8 +33,9 @@ async function main() {
   const committeeUser = await prisma.user.create({
     data: {
       email: 'organizer@nexusops.com',
-      fullName: 'Elena Rostova',
-      globalRole: GlobalRole.USER,
+      firstName: 'Elena',
+      lastName: 'Rostova',
+      role: UserRole.ORGANIZER,
     },
   });
 
@@ -41,8 +43,9 @@ async function main() {
   const buyerUser = await prisma.user.create({
     data: {
       email: 'buyer@gmail.com',
-      fullName: 'Alex Vance',
-      globalRole: GlobalRole.USER,
+      firstName: 'Alex',
+      lastName: 'Vance',
+      role: UserRole.BUYER,
     },
   });
 

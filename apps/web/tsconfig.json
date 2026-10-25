@@ -1,6 +1,10 @@
 {
   "extends": "@open-ticket/config/tsconfig.base.json",
   "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "composite": false,
+    "forceConsistentCasingInFileNames": true,
     "jsx": "preserve",
     "plugins": [
       {

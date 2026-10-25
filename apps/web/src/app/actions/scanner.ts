@@ -16,28 +16,39 @@ export interface ScanResult {
   };
 }
 
+function displayName(owner: { firstName: string; lastName: string } | null | undefined) {
+  if (!owner) return 'Attendee';
+  const name = `${owner.firstName} ${owner.lastName}`.trim();
+  return name && name !== '-' ? name : 'Attendee';
+}
+
 export async function validateGateScan(scannedPayload: string): Promise<ScanResult> {
   try {
-    console.log('[validateGateScan] Received payload:', scannedPayload);
+    const payload = typeof scannedPayload === 'string' ? scannedPayload.trim() : '';
+    if (!payload) {
+      return { status: 'INVALID_SIGNATURE', message: 'Empty scan.' };
+    }
 
     let resolvedTicketId: string | null = null;
 
-    // 1. Verify dynamic HMAC signature
-    const cryptoResult = verifyDynamicQRToken(scannedPayload, 30);
+    // 1. Verify dynamic HMAC/TOTP signature
+    const cryptoResult = verifyDynamicQRToken(payload, 30);
 
     if (cryptoResult.valid && cryptoResult.ticketId) {
       resolvedTicketId = cryptoResult.ticketId;
     } else {
-      console.warn('[validateGateScan] Dynamic TOTP check failed:', cryptoResult.reason);
+      console.warn('[validateGateScan] Dynamic check failed:', cryptoResult.reason);
 
-      // Fallback: Check if payload matches direct ticket.id or stored qrPayload
+      // Fallback: match the stored signed payload. Matching a raw ticket ID
+      // is only allowed outside production (handy for manual testing).
       const directTicket = await db.ticket.findFirst({
         where: {
           OR: [
-            { id: scannedPayload },
-            { qrPayload: scannedPayload },
+            { qrPayload: payload },
+            ...(process.env.NODE_ENV !== 'production' ? [{ id: payload }] : []),
           ],
         },
+        select: { id: true },
       });
 
       if (directTicket) {
@@ -58,7 +69,7 @@ export async function validateGateScan(scannedPayload: string): Promise<ScanResu
       };
     }
 
-    // 2. Fetch ticket details from Neon DB
+    // 2. Fetch ticket details
     const ticket = await db.ticket.findUnique({
       where: { id: resolvedTicketId },
       include: {
@@ -72,37 +83,52 @@ export async function validateGateScan(scannedPayload: string): Promise<ScanResu
       return { status: 'NOT_FOUND', message: 'Ticket Record Not Found' };
     }
 
-    // 3. Prevent duplicate check-ins
+    const ticketInfo = {
+      id: ticket.id,
+      ownerName: displayName(ticket.owner),
+      tierName: ticket.tier.name,
+      eventTitle: ticket.event.title,
+    };
+
+    // 3. Already checked in
     if (ticket.status === TicketStatus.CHECKED_IN) {
       return {
         status: 'DUPLICATE',
         message: 'ALREADY CHECKED IN!',
-        ticket: {
-          id: ticket.id,
-          ownerName: ticket.owner?.fullName || 'Attendee',
-          tierName: ticket.tier.name,
-          eventTitle: ticket.event.title,
-        },
+        ticket: ticketInfo,
       };
     }
 
-    // 4. Update status in Neon DB
-    const updatedTicket = await db.ticket.update({
-      where: { id: ticket.id },
+    // 4. Only paid tickets may enter (not reserved, available, cancelled, etc.)
+    if (ticket.status !== TicketStatus.PAID) {
+      return {
+        status: 'NOT_FOUND',
+        message: `Ticket is not valid for entry (status: ${ticket.status}).`,
+        ticket: ticketInfo,
+      };
+    }
+
+    // 5. Claim the check-in atomically. If two scanners hit the same ticket
+    // at the same moment, only one update matches and the other is a duplicate.
+    const claimed = await db.ticket.updateMany({
+      where: { id: ticket.id, status: TicketStatus.PAID },
       data: { status: TicketStatus.CHECKED_IN },
     });
+
+    if (claimed.count === 0) {
+      return {
+        status: 'DUPLICATE',
+        message: 'ALREADY CHECKED IN!',
+        ticket: ticketInfo,
+      };
+    }
 
     revalidatePath('/committee');
 
     return {
       status: 'VALID',
       message: 'ACCESS GRANTED',
-      ticket: {
-        id: updatedTicket.id,
-        ownerName: ticket.owner?.fullName || 'Attendee',
-        tierName: ticket.tier.name,
-        eventTitle: ticket.event.title,
-      },
+      ticket: ticketInfo,
     };
   } catch (error) {
     console.error('Gate Processing Error:', error);

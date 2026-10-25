@@ -6,21 +6,39 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 export async function issueDemoTicket(formData: FormData) {
-  const tierId = formData.get('tierId') as string;
-  const eventId = formData.get('eventId') as string;
+  // Demo helper: it hands out free PAID tickets, so it must never run in production.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Demo ticket issuing is disabled in production.');
+  }
 
-  if (!tierId || !eventId) {
+  const tierId = formData.get('tierId');
+  const eventId = formData.get('eventId');
+
+  if (typeof tierId !== 'string' || typeof eventId !== 'string' || !tierId || !eventId) {
     throw new Error('Missing tierId or eventId in form submission');
   }
 
   try {
+    // 0. Make sure the tier really belongs to the event
+    const tier = await db.ticketTier.findUnique({
+      where: { id: tierId },
+      select: { eventId: true },
+    });
+    if (!tier || tier.eventId !== eventId) {
+      throw new Error('Ticket tier not found for this event.');
+    }
+
     // 1. Fetch or create owner user
+    // NOTE: this mirrors the dashboard, which also loads the first user.
+    // Replace both with the signed-in session user when auth is wired up.
     let user = await db.user.findFirst();
     if (!user) {
       user = await db.user.create({
         data: {
           email: 'attendee@openticket.io',
-          fullName: 'T.A.I.C. Avinash Perera',
+          firstName: 'Avinash',
+          lastName: 'Perera',
+          role: 'BUYER',
         },
       });
     }
