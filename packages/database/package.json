@@ -21,15 +21,11 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.2.0",
-    "@prisma/adapter-neon": "^7.10.1",
-    "@prisma/client": "^5.22.0",
-    "ws": "^8.22.0"
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "@open-ticket/config": "workspace:*",
     "@types/node": "^20.12.0",
-    "@types/ws": "^8.18.2",
     "prisma": "^5.22.0",
     "tsx": "^4.23.15",
     "typescript": "^5.4.0"
