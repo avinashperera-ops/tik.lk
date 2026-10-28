@@ -1,12 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaNeonHttp } from '@prisma/adapter-neon';
-import { neon } from '@neondatabase/serverless';
 
 const connectionString = process.env.DATABASE_URL!;
 
-// Executes database queries over HTTPS (port 443) to bypass Vercel TCP firewall restrictions
-const sql = neon(connectionString);
-const adapter = new (PrismaNeonHttp as any)(sql);
+// Pass connection string directly to avoid Webpack method-binding issues on the neon fetch function
+const adapter = new (PrismaNeonHttp as any)(connectionString);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
