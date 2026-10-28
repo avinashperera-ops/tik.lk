@@ -1,12 +1,12 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaNeonHTTP } from '@prisma/adapter-neon';
+import { PrismaNeonHttp } from '@prisma/adapter-neon';
 import { neon } from '@neondatabase/serverless';
 
 const connectionString = process.env.DATABASE_URL!;
 
 // Forces standard HTTPS (port 443) instead of blocked TCP port 6543
 const sql = neon(connectionString);
-const adapter = new PrismaNeonHTTP(sql);
+const adapter = new PrismaNeonHttp(sql);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
