@@ -5,8 +5,8 @@ import { neon } from '@neondatabase/serverless';
 const connectionString = process.env.DATABASE_URL!;
 
 const sql = neon(connectionString);
-// Type-cast to any to bypass strict parameter count mismatches across SDK versions
-const adapter = new PrismaNeonHttp(sql as any);
+// Pass an empty options object as the second argument to satisfy the 2-argument signature
+const adapter = new PrismaNeonHttp(sql, {} as any);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
